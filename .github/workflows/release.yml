@@ -51,27 +51,27 @@ jobs:
             target: x86_64-pc-windows-msvc
             tarball: quicssh-Windows-x86_64.tar.gz
           - name: FreeBSD-x86_64
-            host: ubuntu-20.04
+            host: ubuntu-22.04
             target: x86_64-unknown-freebsd
             tarball: quicssh-FreeBSD-x86_64.tar.gz
           - name: Linux-i686
-            host: ubuntu-20.04
+            host: ubuntu-22.04
             target: i686-unknown-linux-musl
             tarball: quicssh-Linux-i686-musl.tar.gz
           - name: Linux-x86_64
-            host: ubuntu-20.04
+            host: ubuntu-22.04
             target: x86_64-unknown-linux-musl
             tarball: quicssh-Linux-x86_64-musl.tar.gz
           - name: Linux-arm
-            host: ubuntu-20.04
+            host: ubuntu-22.04
             target: arm-unknown-linux-musleabi
             tarball: quicssh-Linux-arm-musl.tar.gz
           - name: Linux-armhf
-            host: ubuntu-20.04
+            host: ubuntu-22.04
             target: armv7-unknown-linux-musleabihf
             tarball: quicssh-Linux-armhf-musl.tar.gz
           - name: Linux-aarch64
-            host: ubuntu-20.04
+            host: ubuntu-22.04
             target: aarch64-unknown-linux-musl
             tarball: quicssh-Linux-aarch64-musl.tar.gz
           - name: macOS-x86_64
