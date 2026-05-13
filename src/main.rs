@@ -19,7 +19,7 @@ struct Cli {
     /// Location of log, Default if
     #[clap(value_parser, long = "log")]
     log_file: Option<PathBuf>,
-    /// Log level, Default Error
+    /// Log level, Default Info
     #[clap(long)]
     log_level: Option<LevelFilter>,
 }
@@ -37,7 +37,7 @@ fn main() {
 
     let level = match args.log_level {
         Some(log_level) => log_level,
-        None => LevelFilter::Error,
+        None => LevelFilter::Info,
     };
     let config = match args.log_file {
         Some(log_file) => {

@@ -99,22 +99,22 @@ pub async fn run(options: Opt) -> Result<(), Box<dyn Error>> {
             }
         };
 
+        let remote_addr = conn.remote_address();
         let sni = conn
             .handshake_data()
             .unwrap()
             .downcast::<crypto::rustls::HandshakeData>()
             .unwrap()
             .server_name
-            .unwrap_or(conn.remote_address().ip().to_string());
+            .unwrap_or(remote_addr.ip().to_string());
         let proxy_to = conf.proxy.get(&sni).unwrap_or(&default_proxy).clone();
         info!(
-            "[server] connection accepted: ({}, {}) -> {}",
-            conn.remote_address(),
-            sni,
-            proxy_to
+            "[audit] accepted connection from {} (sni={}) -> {}",
+            remote_addr, sni, proxy_to
         );
         tokio::spawn(async move {
             handle_connection(proxy_to, conn).await;
+            info!("[audit] closed connection from {}", remote_addr);
         });
         // Dropping all handles associated with a connection implicitly closes it
     }
