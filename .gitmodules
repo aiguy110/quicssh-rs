@@ -1,0 +1,3 @@
+[submodule "vendor/quinn"]
+	path = vendor/quinn
+	url = https://github.com/aiguy110/quinn.git

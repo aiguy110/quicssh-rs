@@ -1,7 +1,9 @@
+use crate::auth;
 use clap::Parser;
 use quinn::{crypto, Endpoint, ServerConfig, VarInt};
+use rustls_pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::error::Error;
@@ -25,15 +27,80 @@ pub struct Opt {
     conf_path: Option<PathBuf>,
 }
 
-/// Returns default server configuration along with its certificate.
-fn configure_server() -> Result<(ServerConfig, Vec<u8>), Box<dyn Error>> {
-    let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
-    let cert_der = cert.serialize_der().unwrap();
-    let priv_key = cert.serialize_private_key_der();
-    let priv_key = rustls::PrivateKey(priv_key);
-    let cert_chain = vec![rustls::Certificate(cert_der.clone())];
+/// Cert resolver that gates the handshake on the presence of an ALPN
+/// extension when auth is enabled. The actual ALPN value comparison is done
+/// by rustls against the configured `alpn_protocols` list, but rustls will
+/// happily accept a client that sends no ALPN at all if the server-side
+/// list is empty or matches nothing — so we reject "no ALPN" here.
+#[derive(Debug)]
+struct AuthCertResolver {
+    cert: Arc<rustls::sign::CertifiedKey>,
+    require_alpn: bool,
+}
 
-    let mut server_config = ServerConfig::with_single_cert(cert_chain, priv_key)?;
+impl rustls::server::ResolvesServerCert for AuthCertResolver {
+    fn resolve(
+        &self,
+        client_hello: rustls::server::ClientHello,
+    ) -> Option<Arc<rustls::sign::CertifiedKey>> {
+        if self.require_alpn {
+            match client_hello.alpn() {
+                None => {
+                    warn!("[server] rejecting handshake: no ALPN extension");
+                    return None;
+                }
+                Some(mut iter) => {
+                    if iter.next().is_none() {
+                        warn!("[server] rejecting handshake: empty ALPN");
+                        return None;
+                    }
+                }
+            }
+        }
+        Some(self.cert.clone())
+    }
+}
+
+fn generate_cert() -> Result<
+    (
+        Vec<CertificateDer<'static>>,
+        PrivateKeyDer<'static>,
+        CertificateDer<'static>,
+    ),
+    Box<dyn Error>,
+> {
+    let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()])?;
+    let cert_der: CertificateDer<'static> = cert.cert.der().clone();
+    let priv_key: PrivateKeyDer<'static> =
+        PrivatePkcs8KeyDer::from(cert.key_pair.serialize_der()).into();
+    let cert_chain = vec![cert_der.clone()];
+    Ok((cert_chain, priv_key, cert_der))
+}
+
+/// Build a `ServerConfig` using the supplied cert and the current valid auth
+/// tokens (if any). When `auth_secret` is `None`, behaviour matches the
+/// original codebase (no ALPN gating).
+fn build_server_config(
+    cert_chain: Vec<CertificateDer<'static>>,
+    priv_key: PrivateKeyDer<'static>,
+    auth_secret: Option<&[u8]>,
+) -> Result<ServerConfig, Box<dyn Error>> {
+    let signing_key = rustls::crypto::ring::sign::any_supported_type(&priv_key)?;
+    let certified = Arc::new(rustls::sign::CertifiedKey::new(cert_chain, signing_key));
+
+    let mut crypto = rustls::ServerConfig::builder()
+        .with_no_client_auth()
+        .with_cert_resolver(Arc::new(AuthCertResolver {
+            cert: certified,
+            require_alpn: auth_secret.is_some(),
+        }));
+
+    if let Some(secret) = auth_secret {
+        crypto.alpn_protocols = auth::valid_tokens(secret);
+    }
+
+    let quic_crypto = quinn::crypto::rustls::QuicServerConfig::try_from(crypto)?;
+    let mut server_config = ServerConfig::with_crypto(Arc::new(quic_crypto));
     let transport_config = Arc::get_mut(&mut server_config.transport).unwrap();
     transport_config.max_concurrent_uni_streams(0_u8.into());
     transport_config.max_idle_timeout(Some(VarInt::from_u32(60_000).into()));
@@ -41,14 +108,18 @@ fn configure_server() -> Result<(ServerConfig, Vec<u8>), Box<dyn Error>> {
     #[cfg(any(windows, target_os = "linux"))]
     transport_config.mtu_discovery_config(Some(quinn::MtuDiscoveryConfig::default()));
 
-    Ok((server_config, cert_der))
+    Ok(server_config)
 }
 
 #[allow(unused)]
-pub fn make_server_endpoint(bind_addr: SocketAddr) -> Result<(Endpoint, Vec<u8>), Box<dyn Error>> {
-    let (server_config, server_cert) = configure_server()?;
+pub fn make_server_endpoint(
+    bind_addr: SocketAddr,
+) -> Result<(Endpoint, CertificateDer<'static>), Box<dyn Error>> {
+    let (cert_chain, priv_key, cert_der) = generate_cert()?;
+    let auth_secret = auth::secret_from_env();
+    let server_config = build_server_config(cert_chain, priv_key, auth_secret.as_deref())?;
     let endpoint = Endpoint::server(server_config, bind_addr)?;
-    Ok((endpoint, server_cert))
+    Ok((endpoint, cert_der))
 }
 
 #[derive(Deserialize, Debug)]
@@ -74,27 +145,106 @@ pub async fn run(options: Opt) -> Result<(), Box<dyn Error>> {
     };
 
     let default_proxy = match conf.proxy.get("default") {
-        Some(sock) => sock.clone(),
+        Some(sock) => *sock,
         None => options
             .proxy_to
             .unwrap_or(SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 22)),
     };
     info!("[server] default proxy aim: {}", default_proxy);
 
-    let (endpoint, _) = make_server_endpoint(options.listen).unwrap();
+    let auth_secret = auth::secret_from_env();
+    let (cert_chain, priv_key, _cert_der) = generate_cert().unwrap();
+    let initial_config = build_server_config(
+        cert_chain.clone(),
+        priv_key.clone_key(),
+        auth_secret.as_deref(),
+    )
+    .unwrap();
+    let endpoint = Endpoint::server(initial_config, options.listen).unwrap();
     info!("[server] listening on: {}", options.listen);
+
+    if auth_secret.is_some() {
+        info!(
+            "[server] ALPN auth enabled (window={}s); rejecting handshakes without a valid token",
+            auth::WINDOW_SECS
+        );
+        let endpoint_for_refresh = endpoint.clone();
+        let secret = auth_secret.clone().unwrap();
+        let cert_chain_r = cert_chain.clone();
+        let priv_key_r = priv_key.clone_key();
+        tokio::spawn(async move {
+            let mut interval =
+                tokio::time::interval(std::time::Duration::from_secs(auth::WINDOW_SECS / 2));
+            interval.tick().await; // skip the immediate fire
+            loop {
+                interval.tick().await;
+                match build_server_config(
+                    cert_chain_r.clone(),
+                    priv_key_r.clone_key(),
+                    Some(&secret),
+                ) {
+                    Ok(cfg) => {
+                        endpoint_for_refresh.set_server_config(Some(cfg));
+                        debug!(
+                            "[server] rotated auth tokens (window={})",
+                            auth::current_window()
+                        );
+                    }
+                    Err(e) => error!("[server] failed to rebuild server config: {}", e),
+                }
+            }
+        });
+    } else {
+        warn!(
+            "[server] {} not set: no handshake authentication — anyone reaching the port can probe the QUIC service",
+            auth::ENV_VAR
+        );
+    }
     // accept a single connection
     loop {
-        let incoming_conn = match endpoint.accept().await {
-            Some(conn) => conn,
+        let incoming = match endpoint.accept().await {
+            Some(inc) => inc,
             None => {
                 continue;
             }
         };
-        let conn = match incoming_conn.await {
-            Ok(conn) => conn,
+
+        if let Some(secret) = auth_secret.as_deref() {
+            let remote = incoming.remote_address();
+            let hs = match incoming.handshake_bytes() {
+                Ok(b) => b,
+                Err(e) => {
+                    debug!(
+                        "[server] silent-drop {}: handshake_bytes failed: {}",
+                        remote, e
+                    );
+                    incoming.ignore();
+                    continue;
+                }
+            };
+            let alpns = auth::parse_client_hello_alpn(&hs).unwrap_or_default();
+            let refs: Vec<&[u8]> = alpns.iter().map(|v| v.as_slice()).collect();
+            if !auth::any_token_valid(secret, &refs) {
+                debug!(
+                    "[server] silent-drop {}: ALPN auth token missing/invalid",
+                    remote
+                );
+                incoming.ignore();
+                continue;
+            }
+        }
+
+        let connecting = match incoming.accept() {
+            Ok(c) => c,
             Err(e) => {
                 error!("[server] accept connection error: {}", e);
+                continue;
+            }
+        };
+        let conn = match connecting.await {
+            Ok(conn) => conn,
+            Err(e) => {
+                error!("[server] handshake error: {}", e);
                 continue;
             }
         };
@@ -107,7 +257,7 @@ pub async fn run(options: Opt) -> Result<(), Box<dyn Error>> {
             .unwrap()
             .server_name
             .unwrap_or(remote_addr.ip().to_string());
-        let proxy_to = conf.proxy.get(&sni).unwrap_or(&default_proxy).clone();
+        let proxy_to = *conf.proxy.get(&sni).unwrap_or(&default_proxy);
         info!(
             "[audit] accepted connection from {} (sni={}) -> {}",
             remote_addr, sni, proxy_to

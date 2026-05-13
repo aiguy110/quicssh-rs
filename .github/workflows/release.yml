@@ -85,6 +85,8 @@ jobs:
     steps:
       # checkout
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       # build raw
       - name: Cache cargo & target directories
@@ -93,7 +95,7 @@ jobs:
         run: sudo apt-get update --yes && sudo apt-get install --yes musl-tools
         if: contains(matrix.platform.target, 'musl')
       - name: Build binary
-        uses: houseabsolute/actions-rust-cross@v0
+        uses: houseabsolute/actions-rust-cross@v1
         with:
           command: "build"
           target: ${{ matrix.platform.target }}
@@ -123,7 +125,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: deb+${{ matrix.platform.target }}
-          path: "target/${{matrix.platform.target}}/debian/*.deb"
+          path: |
+            target/${{matrix.platform.target}}/debian/*.deb
+            target/debian/*.deb
         if: matrix.const.as_r && contains(matrix.platform.target, 'linux')
 
       # build rpm
@@ -169,11 +173,12 @@ jobs:
         if: matrix.const.is_t
       # publish tar + deb + rpm
       - name: Publish GitHub release artifacts
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           draft: true
           files: |
             quicssh-*
             target/${{ matrix.platform.target }}/debian/*.deb
             target/${{ matrix.platform.target }}/generate-rpm/*.rpm
+            target/debian/*.deb
         if: matrix.const.is_r && matrix.const.toolchain == 'stable'
