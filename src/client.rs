@@ -25,13 +25,13 @@ pub struct Opt {
 }
 
 /// Enables MTUD if supported by the operating system
-#[cfg(not(any(windows, os = "linux")))]
+#[cfg(not(any(windows, target_os = "linux")))]
 pub fn enable_mtud_if_supported() -> quinn::TransportConfig {
     quinn::TransportConfig::default()
 }
 
 /// Enables MTUD if supported by the operating system
-#[cfg(any(windows, os = "linux"))]
+#[cfg(any(windows, target_os = "linux"))]
 pub fn enable_mtud_if_supported() -> quinn::TransportConfig {
     let mut transport_config = quinn::TransportConfig::default();
     transport_config.mtu_discovery_config(Some(quinn::MtuDiscoveryConfig::default()));
