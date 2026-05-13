@@ -27,3 +27,39 @@ extended-description = """\
 section = "net"
 priority = "optional"
 suggests = "openssh-server"
+assets = [
+    ["target/release/quicssh-rs", "/usr/bin/", "755"],
+    ["README.md", "/usr/share/doc/quicssh-rs/README", "644"],
+    ["LICENSE", "/usr/share/doc/quicssh-rs/LICENSE", "644"],
+]
+
+[package.metadata.deb.systemd-units]
+unit-name = "quicssh-rs"
+enable = false
+start = false
+restart-after-upgrade = true
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/quicssh-rs", dest = "/usr/bin/quicssh-rs", mode = "755" },
+    { source = "quicssh-rs.service", dest = "/usr/lib/systemd/system/quicssh-rs.service", mode = "644" },
+    { source = "README.md", dest = "/usr/share/doc/quicssh-rs/README", mode = "644", doc = true },
+    { source = "LICENSE", dest = "/usr/share/doc/quicssh-rs/LICENSE", mode = "644", doc = true },
+]
+post_install_script = """
+systemctl daemon-reload >/dev/null 2>&1 || :
+"""
+pre_uninstall_script = """
+if [ $1 -eq 0 ]; then
+    systemctl --no-reload disable --now quicssh-rs.service >/dev/null 2>&1 || :
+fi
+"""
+post_uninstall_script = """
+systemctl daemon-reload >/dev/null 2>&1 || :
+if [ $1 -ge 1 ]; then
+    systemctl try-restart quicssh-rs.service >/dev/null 2>&1 || :
+fi
+"""
+
+[package.metadata.generate-rpm.requires]
+systemd = "*"

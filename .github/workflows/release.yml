@@ -112,8 +112,8 @@ jobs:
       - name: Install cargo-binstall
         uses: cargo-bins/cargo-binstall@v1.6.4
         if: matrix.const.as_r && contains(matrix.platform.target, 'linux')
-      - name: BInstall cargo-deb
-        run: cargo binstall --force -y cargo-deb
+      - name: BInstall cargo-deb and cargo-generate-rpm
+        run: cargo binstall --force -y cargo-deb cargo-generate-rpm
         if: matrix.const.as_r && contains(matrix.platform.target, 'linux')
       - name: Build deb package
         run: cargo deb --no-build --no-strip --target ${{ matrix.platform.target }}
@@ -124,6 +124,18 @@ jobs:
         with:
           name: deb+${{ matrix.platform.target }}
           path: "target/${{matrix.platform.target}}/debian/*.deb"
+        if: matrix.const.as_r && contains(matrix.platform.target, 'linux')
+
+      # build rpm
+      - name: Build rpm package
+        run: cargo generate-rpm --target ${{ matrix.platform.target }}
+        if: matrix.const.as_r && contains(matrix.platform.target, 'linux')
+      # upload rpm
+      - name: Upload rpm package
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpm+${{ matrix.platform.target }}
+          path: "target/${{matrix.platform.target}}/generate-rpm/*.rpm"
         if: matrix.const.as_r && contains(matrix.platform.target, 'linux')
 
       # build tar
