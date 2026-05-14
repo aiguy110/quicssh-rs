@@ -10,7 +10,7 @@ on:
   pull_request:
 
 env:
-  CRATE_NAME: quicssh-rs
+  CRATE_NAME: quicssh-proxy
   GITHUB_TOKEN: ${{ github.token }}
   RUST_BACKTRACE: 1
 
@@ -29,7 +29,7 @@ jobs:
           # as_r: true/false whether to act as release (but not release)
           # is_r: true/false whether is release
           # is_r: true/false whether is test
-          - binbase: quicssh-rs
+          - binbase: quicssh-proxy
             toolchain: stable
             as_r: ${{ startsWith(github.ref,'refs/tags/v') || startsWith(github.ref, 'refs/tags/test-release') }}
             is_r: ${{ startsWith(github.ref,'refs/tags/v') }}
@@ -107,7 +107,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: raw+${{ matrix.platform.target }}
-          path: "target/${{matrix.platform.target}}/release/quicssh-rs*"
+          path: "target/${{matrix.platform.target}}/release/quicssh-proxy*"
         #if : matrix.const.as_r
 
       # build deb

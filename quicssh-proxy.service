@@ -25,7 +25,7 @@ SystemCallFilter=@system-service
 SystemCallFilter=~@resources @privileged
 
 Restart=always
-ExecStart=/usr/bin/quicssh-rs server
+ExecStart=/usr/bin/quicssh-proxy server
 
 [Install]
 WantedBy=multi-user.target

@@ -2,6 +2,8 @@
 
 > :smile: **quicssh-rs** is a QUIC proxy that allows to use QUIC to connect to an SSH server without needing to patch the client or the server.
 
+The Debian/RPM packages and release tarballs install the binary as `quicssh-proxy`. The examples below use that name; if you build from source via `cargo build`, the resulting binary is also named `quicssh-proxy`.
+
 `quicssh-rs` is [quicssh](https://github.com/moul/quicssh) rust implementation. It is based on [quinn](https://github.com/quinn-rs/quinn) and [tokio](https://github.com/tokio-rs/tokio)
 
 Why use QUIC? Because SSH is vulnerable in TCP connection environments, and most SSH packets are actually small, so it is only necessary to maintain the SSH connection to use it in any network environment. QUIC is a good choice because it has good weak network optimization and an important feature called connection migration. This means that I can switch Wi-Fi networks freely when remote, ensuring a stable SSH connection.
@@ -35,7 +37,7 @@ SSH Connection proxified with QUIC
 ┌───────────────────────────────────────┐             ┌───────────────────────┐
 │                  bob                  │             │         wopr          │
 │ ┌───────────────────────────────────┐ │             │ ┌───────────────────┐ │
-│ │ssh -o ProxyCommand="quicssh-rs    │ │             │ │       sshd        │ │
+│ │ssh -o ProxyCommand="quicssh-proxy │ │             │ │       sshd        │ │
 │ │ client quic://%h:4433"            │ │             │ └───────────────────┘ │
 │ │       user@wopr                   │ │             │           ▲           │
 │ └───────────────────────────────────┘ │             │           │           │
@@ -44,7 +46,7 @@ SSH Connection proxified with QUIC
 │                   │                   │             │           │           │
 │                   ▼                   │             │           │           │
 │ ┌───────────────────────────────────┐ │             │┌─────────────────────┐│
-│ │  quicssh-rs client wopr:4433      │─┼─quic (udp)─▶│   quicssh-rs server ││
+│ │  quicssh-proxy client wopr:4433   │─┼─quic (udp)─▶│  quicssh-proxy server ││
 │ └───────────────────────────────────┘ │             │└─────────────────────┘│
 └───────────────────────────────────────┘             └───────────────────────┘
 ```
@@ -52,10 +54,10 @@ SSH Connection proxified with QUIC
 ## Usage
 
 ```console
-$ quicssh-rs -h
+$ quicssh-proxy -h
 A simple ssh server based on quic protocol
 
-Usage: quicssh-rs <COMMAND>
+Usage: quicssh-proxy <COMMAND>
 
 Commands:
   server  Server
@@ -72,10 +74,10 @@ Options:
 ### Client
 
 ```console
-$ quicssh-rs client -h
+$ quicssh-proxy client -h
 Client
 
-Usage: quicssh-rs client [OPTIONS] <URL>
+Usage: quicssh-proxy client [OPTIONS] <URL>
 
 Arguments:
   <URL>  Server address
@@ -94,7 +96,7 @@ Host test
     HostName test.test
     User root
     Port 22333
-    ProxyCommand /Users/ouyangjun/code/quicssh-rs/target/release/quicssh-rs client quic://%h:%p
+    ProxyCommand /Users/ouyangjun/code/quicssh-rs/target/release/quicssh-proxy client quic://%h:%p
 
 ╰─$ ssh test
 Last login: Mon May  1 13:32:15 2023 from 127.0.0.1
@@ -103,10 +105,10 @@ Last login: Mon May  1 13:32:15 2023 from 127.0.0.1
 ### Server
 
 ```console
-$ quicssh-rs server -h
+$ quicssh-proxy server -h
 Server
 
-Usage: quicssh-rs server [OPTIONS]
+Usage: quicssh-proxy server [OPTIONS]
 
 Options:
   -l, --listen <LISTEN>        Address to listen on [default: 0.0.0.0:4433]

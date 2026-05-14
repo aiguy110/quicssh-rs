@@ -1,12 +1,16 @@
 [package]
 name = "quicssh-rs"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 license = "MIT"
 authors = ["oowl <ouyangjun1999@gmail.com>"]
 description = "A simple ssh server based on quic protocol"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "quicssh-proxy"
+path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4.5.38", features = ["derive"] }
@@ -31,42 +35,45 @@ quinn-proto = { path = "vendor/quinn/quinn-proto" }
 quinn-udp = { path = "vendor/quinn/quinn-udp" }
 
 [package.metadata.deb]
+name = "quicssh-proxy"
 extended-description = """\
-:) quicssh-rs is a QUIC proxy that allows to use QUIC to connect to an SSH server without needing to patch the client or the server."""
+:) quicssh-proxy is a QUIC proxy that allows to use QUIC to connect to an SSH server without needing to patch the client or the server."""
 section = "net"
 priority = "optional"
 suggests = "openssh-server"
 assets = [
-    ["target/release/quicssh-rs", "/usr/bin/", "755"],
-    ["README.md", "/usr/share/doc/quicssh-rs/README", "644"],
-    ["LICENSE", "/usr/share/doc/quicssh-rs/LICENSE", "644"],
+    ["target/release/quicssh-proxy", "/usr/bin/", "755"],
+    ["README.md", "/usr/share/doc/quicssh-proxy/README", "644"],
+    ["LICENSE", "/usr/share/doc/quicssh-proxy/LICENSE", "644"],
 ]
 
 [package.metadata.deb.systemd-units]
-unit-name = "quicssh-rs"
+unit-name = "quicssh-proxy"
+unit-scripts = "."
 enable = false
 start = false
 restart-after-upgrade = true
 
 [package.metadata.generate-rpm]
+name = "quicssh-proxy"
 assets = [
-    { source = "target/release/quicssh-rs", dest = "/usr/bin/quicssh-rs", mode = "755" },
-    { source = "quicssh-rs.service", dest = "/usr/lib/systemd/system/quicssh-rs.service", mode = "644" },
-    { source = "README.md", dest = "/usr/share/doc/quicssh-rs/README", mode = "644", doc = true },
-    { source = "LICENSE", dest = "/usr/share/doc/quicssh-rs/LICENSE", mode = "644", doc = true },
+    { source = "target/release/quicssh-proxy", dest = "/usr/bin/quicssh-proxy", mode = "755" },
+    { source = "quicssh-proxy.service", dest = "/usr/lib/systemd/system/quicssh-proxy.service", mode = "644" },
+    { source = "README.md", dest = "/usr/share/doc/quicssh-proxy/README", mode = "644", doc = true },
+    { source = "LICENSE", dest = "/usr/share/doc/quicssh-proxy/LICENSE", mode = "644", doc = true },
 ]
 post_install_script = """
 systemctl daemon-reload >/dev/null 2>&1 || :
 """
 pre_uninstall_script = """
 if [ $1 -eq 0 ]; then
-    systemctl --no-reload disable --now quicssh-rs.service >/dev/null 2>&1 || :
+    systemctl --no-reload disable --now quicssh-proxy.service >/dev/null 2>&1 || :
 fi
 """
 post_uninstall_script = """
 systemctl daemon-reload >/dev/null 2>&1 || :
 if [ $1 -ge 1 ]; then
-    systemctl try-restart quicssh-rs.service >/dev/null 2>&1 || :
+    systemctl try-restart quicssh-proxy.service >/dev/null 2>&1 || :
 fi
 """
 
