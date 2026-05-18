@@ -8,10 +8,6 @@ The Debian/RPM packages and release tarballs install the binary as `quicssh-prox
 
 Why use QUIC? Because SSH is vulnerable in TCP connection environments, and most SSH packets are actually small, so it is only necessary to maintain the SSH connection to use it in any network environment. QUIC is a good choice because it has good weak network optimization and an important feature called connection migration. This means that I can switch Wi-Fi networks freely when remote, ensuring a stable SSH connection.
 
-## Demo
-
-https://user-images.githubusercontent.com/39181969/235409750-234de94a-1189-4288-93c2-45f62a9dfc48.mp4
-
 ## Why not mosh?
 
 Because the architecture of mosh requires the opening of many ports to support control and data connections, which is not very user-friendly in many environments. In addition, vscode remote development does not support mosh.
@@ -116,5 +112,21 @@ Options:
   -h, --help                   Print help
   -V, --version                Print version
 ```
+
+## Silent-drop handshake authentication (`QUICSSH_AUTH_SECRET`)
+
+When the server is started with the environment variable `QUICSSH_AUTH_SECRET` set to a shared secret, it requires every incoming QUIC handshake to carry a matching HMAC-derived token (smuggled in the TLS ALPN extension). Packets that don't carry a valid token — including ordinary QUIC scans and probes that don't know the secret — are dropped without any reply, so the listening UDP port is indistinguishable from a closed/filtered port to an outside observer. Tokens rotate on a fixed window so a captured token can't be replayed indefinitely.
+
+To use it, set the same secret on both ends:
+
+```console
+# server
+QUICSSH_AUTH_SECRET='your-shared-secret' quicssh-proxy server -l 0.0.0.0:4433
+
+# client
+QUICSSH_AUTH_SECRET='your-shared-secret' quicssh-proxy client quic://host:4433
+```
+
+When `QUICSSH_AUTH_SECRET` is unset on the server, authentication is disabled and the server behaves as a normal QUIC endpoint (responding to handshakes from any client). This relies on a small patch to the vendored `quinn` fork that suppresses Version Negotiation, stateless reset, and Initial CONNECTION_CLOSE responses for unauthenticated peers — without it, the port could still be fingerprinted via standard QUIC protocol responses even though the application-layer handshake would fail.
 
 [![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
