@@ -166,8 +166,7 @@ pub async fn run(options: Opt) -> Result<(), Box<dyn Error>> {
     }
     let socket = std::net::UdpSocket::bind(options.listen).unwrap();
     let runtime = quinn::default_runtime().unwrap();
-    let endpoint =
-        Endpoint::new(endpoint_config, Some(initial_config), socket, runtime).unwrap();
+    let endpoint = Endpoint::new(endpoint_config, Some(initial_config), socket, runtime).unwrap();
     info!("[server] listening on: {}", options.listen);
 
     if auth_secret.is_some() {
