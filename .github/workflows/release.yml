@@ -177,8 +177,8 @@ jobs:
         with:
           draft: true
           files: |
-            quicssh-*
+            ${{ matrix.platform.tarball }}
             target/${{ matrix.platform.target }}/debian/*.deb
             target/${{ matrix.platform.target }}/generate-rpm/*.rpm
-            target/debian/*.deb
+            ${{ matrix.platform.name == 'Linux-x86_64' && 'quicssh-proxy.service' || '' }}
         if: matrix.const.is_r && matrix.const.toolchain == 'stable'
