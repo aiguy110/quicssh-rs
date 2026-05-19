@@ -182,10 +182,11 @@ pub async fn run(options: Opt) -> Result<(), Box<dyn Error>> {
 
         loop {
             match recv.read(&mut buf).await {
-                // Return value of `Ok(0)` signifies that the remote has
-                // closed
+                // Return value of `Ok(None)` signifies that the remote has
+                // closed the stream — stop, don't spin.
                 Ok(None) => {
-                    continue;
+                    debug!("[client] quic server finished stream");
+                    return;
                 }
                 Ok(Some(n)) => {
                     debug!("[client] recv data from quic server {} bytes", n);
@@ -217,11 +218,11 @@ pub async fn run(options: Opt) -> Result<(), Box<dyn Error>> {
 
         loop {
             match reader.read(&mut buf).await {
-                // Return value of `Ok(0)` signifies that the remote has
-                // closed
+                // Return value of `Ok(0)` signifies stdin EOF — stop, don't spin.
                 Ok(n) => {
                     if n == 0 {
-                        continue;
+                        debug!("[client] stdin closed (EOF)");
+                        return;
                     }
                     debug!("[client] recv data from stdin {} bytes", n);
                     // Copy the data back to socket
