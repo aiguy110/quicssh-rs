@@ -132,7 +132,7 @@ jobs:
 
       # build rpm
       - name: Build rpm package
-        run: cargo generate-rpm --target ${{ matrix.platform.target }}
+        run: cargo generate-rpm --payload-compress xz --target ${{ matrix.platform.target }}
         if: matrix.const.as_r && contains(matrix.platform.target, 'linux')
       # upload rpm
       - name: Upload rpm package
