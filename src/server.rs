@@ -215,13 +215,13 @@ pub async fn run(options: Opt) -> Result<(), Box<dyn Error>> {
             }
         };
 
+        let remote = incoming.remote_address();
         if let Some(secret) = auth_secret.as_deref() {
-            let remote = incoming.remote_address();
             let hs = match incoming.handshake_bytes() {
                 Ok(b) => b,
                 Err(e) => {
-                    debug!(
-                        "[server] silent-drop {}: handshake_bytes failed: {}",
+                    info!(
+                        "[audit] rejected connection from {}: handshake_bytes failed: {}",
                         remote, e
                     );
                     incoming.ignore();
@@ -231,8 +231,8 @@ pub async fn run(options: Opt) -> Result<(), Box<dyn Error>> {
             let alpns = auth::parse_client_hello_alpn(&hs).unwrap_or_default();
             let refs: Vec<&[u8]> = alpns.iter().map(|v| v.as_slice()).collect();
             if !auth::any_token_valid(secret, &refs) {
-                debug!(
-                    "[server] silent-drop {}: ALPN auth token missing/invalid",
+                info!(
+                    "[audit] rejected connection from {}: ALPN auth token missing/invalid",
                     remote
                 );
                 incoming.ignore();
@@ -243,14 +243,20 @@ pub async fn run(options: Opt) -> Result<(), Box<dyn Error>> {
         let connecting = match incoming.accept() {
             Ok(c) => c,
             Err(e) => {
-                error!("[server] accept connection error: {}", e);
+                error!(
+                    "[audit] rejected connection from {}: accept error: {}",
+                    remote, e
+                );
                 continue;
             }
         };
         let conn = match connecting.await {
             Ok(conn) => conn,
             Err(e) => {
-                error!("[server] handshake error: {}", e);
+                error!(
+                    "[audit] rejected connection from {}: handshake error: {}",
+                    remote, e
+                );
                 continue;
             }
         };
