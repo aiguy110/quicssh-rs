@@ -49,7 +49,7 @@ jobs:
           - name: Windows-x86_64
             host: windows-latest
             target: x86_64-pc-windows-msvc
-            tarball: quicssh-Windows-x86_64.tar.gz
+            tarball: quicssh-Windows-x86_64.zip
           - name: FreeBSD-x86_64
             host: ubuntu-22.04
             target: x86_64-unknown-freebsd
@@ -154,7 +154,7 @@ jobs:
             binname=${{ matrix.const.binbase }}
           fi
           if [[ "${{ matrix.platform.host }}" = "windows-latest" ]]; then
-            7z a ../../../${{ matrix.platform.tarball }} $binname
+            7z a -tzip ../../../${{ matrix.platform.tarball }} $binname
           else
             tar czvf ../../../${{ matrix.platform.tarball }} $binname
           fi
