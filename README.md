@@ -80,6 +80,7 @@ Arguments:
 
 Options:
   -b, --bind <BIND_ADDR>  Client address
+  -v, --verbose           Show client connection logs on stderr
   -h, --help              Print help
   -V, --version           Print version
 ```

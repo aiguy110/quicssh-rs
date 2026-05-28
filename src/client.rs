@@ -23,6 +23,9 @@ pub struct Opt {
     /// Client address
     #[clap(long = "bind", short = 'b')]
     bind_addr: Option<SocketAddr>,
+    /// Show client connection logs on stderr
+    #[clap(long = "verbose", short = 'v')]
+    pub verbose: bool,
 }
 
 /// Enables MTUD if supported by the operating system

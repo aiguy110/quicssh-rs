@@ -38,7 +38,10 @@ fn main() {
 
     let level = match args.log_level {
         Some(log_level) => log_level,
-        None => LevelFilter::Info,
+        None => match &args.command {
+            Commands::Client(client) if !client.verbose => LevelFilter::Error,
+            _ => LevelFilter::Info,
+        },
     };
     let config = match args.log_file {
         Some(log_file) => {
